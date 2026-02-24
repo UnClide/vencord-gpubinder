@@ -1,0 +1,23 @@
+# Vencord / Node.js
+node_modules/
+dist/
+build/
+*.log
+*.tsbuildinfo
+
+# OS junk
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Temporary / build artifacts
+*.tmp
+*.bak
+*.swp
+*~

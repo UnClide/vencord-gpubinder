@@ -55,7 +55,7 @@ mkdir -p userplugins
 
 ```bash
 cd userplugins
-git clone https://github.com/UnClide/vencord-gpu-binder gpuBinder
+git clone https://github.com/UnClide/vencord-gpubinder gpuBinder
 ```
 
 ### 4️⃣ Build Vencord

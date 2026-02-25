@@ -1,3 +1,4 @@
+// src/userplugins/gpuBinder/native.ts
 import { promisify } from "util";
 import { exec as childExec } from "child_process";
 import { IpcMainInvokeEvent } from "electron";
@@ -5,62 +6,50 @@ import { IpcMainInvokeEvent } from "electron";
 const exec = promisify(childExec);
 
 /**
- * applyGpuPreference(preference)
- * - preference: number (2-high perf, 1-power saving, 0-system default)
- * - возвращает Promise<boolean>: true если записали/обновили значение, false если изменений не требовалось
+ * Manages Windows Graphics Settings (DirectX) for Discord.
+ * Automatically binds the current Discord executable to the preferred GPU
+ * and cleans up stale registry entries from previous versions.
  */
 export async function applyGpuPreference(_event: IpcMainInvokeEvent, preference: number): Promise<boolean> {
-  if (process.platform !== "win32") {
-    console.log("[GpuBinder Native] Not running on Windows, skipping registry write.");
-    return false;
-  }
+    // Only Windows supports this registry-based GPU binding
+    if (process.platform !== "win32") return false;
 
-  console.log("[GpuBinder Native] Incoming preference:", preference, "typeof:", typeof preference);
+    // Current Discord executable path (changes with every update)
+    const discordPath = process.execPath;
+    const regPath = "HKCU:\\Software\\Microsoft\\DirectX\\UserGpuPreferences";
+    const gpuValue = `GpuPreference=${preference};`;
 
-  // Принудительно преобразуем в число и проверяем
-  preference = Number(preference);
-  if (isNaN(preference) || ![0, 1, 2].includes(preference)) {
-    console.warn("[GpuBinder Native] Invalid preference value, defaulting to 2 (High Performance).");
-    preference = 2;
-  }
-  console.log("[GpuBinder Native] Resolved preference:", preference);
+    // Escape single quotes for PowerShell
+    const nameEsc = discordPath.replace(/'/g, "''");
+    const valEsc = gpuValue.replace(/'/g, "''");
+    const regPathEsc = regPath.replace(/'/g, "''");
 
-  const discordPath = process.execPath; // полный путь к exe
-  const regPath = "HKCU:\\Software\\Microsoft\\DirectX\\UserGpuPreferences";
-  const gpuValue = `GpuPreference=${preference};`;
-  console.log("[GpuBinder Native] gpuValue:", gpuValue);
+    try {
+        // 1. Check if the current executable already has the correct preference set
+        const checkCmd = `powershell -NoProfile -Command "$p = '${regPathEsc}'; $n = '${nameEsc}'; if (Test-Path $p) { (Get-ItemProperty -Path $p -ErrorAction SilentlyContinue).$n } else { '' }"`;
+        const { stdout } = await exec(checkCmd);
+        const currentValue = (stdout || "").trim();
 
-  // Экранируем одиночные кавычки для безопасной вставки в PowerShell-строки
-  const nameEsc = discordPath.replace(/'/g, "''");
-  const valEsc = gpuValue.replace(/'/g, "''");
-  const regPathEsc = regPath.replace(/'/g, "''");
+        let changed = false;
 
-  try {
-    // Получаем текущее значение (если есть)
-    const checkCmd = `powershell -NoProfile -Command "if (Test-Path -Path '${regPathEsc}') { Get-ItemPropertyValue -Path '${regPathEsc}' -Name '${nameEsc}' -ErrorAction SilentlyContinue }"`;
-    console.log("[GpuBinder Native] checkCmd:", checkCmd);
-    const { stdout: checkOutput, stderr } = await exec(checkCmd);
+        // 2. Apply or update settings if they don't match the desired preference
+        if (currentValue !== gpuValue) {
+            const setCmd = `powershell -NoProfile -Command "$p = '${regPathEsc}'; if (-not (Test-Path $p)) { New-Item -Path $p -Force | Out-Null }; Set-ItemProperty -Path $p -Name '${nameEsc}' -Value '${valEsc}' -Type String -Force"`;
+            await exec(setCmd);
+            console.log("[GpuBinder Native] Applied GPU preference to current Discord path.");
+            changed = true;
+        }
 
-    // Если stderr непустой — логируем, но продолжаем проверку stdout
-    if (stderr) console.warn("[GpuBinder Native] check stderr:", stderr);
-
-    const currentValue = (checkOutput || "").trim();
-    console.log("[GpuBinder Native] currentValue (trimmed):", JSON.stringify(currentValue)); // JSON.stringify для видимости whitespace
-
-    if (currentValue !== gpuValue) {
-      // Создаём ключ только если не существует, затем пишем значение
-      const setCmd = `powershell -NoProfile -Command "if (-not (Test-Path -Path '${regPathEsc}')) { New-Item -Path '${regPathEsc}' | Out-Null }; Set-ItemProperty -Path '${regPathEsc}' -Name '${nameEsc}' -Value '${valEsc}' -Type String -Force"`;
-      console.log("[GpuBinder Native] setCmd:", setCmd);
-      const { stderr: setErr } = await exec(setCmd);
-      if (setErr) console.warn("[GpuBinder Native] set stderr:", setErr);
-      console.log("[GpuBinder Native] Registry value written/updated.");
-      return true;
-    } else {
-      console.log("[GpuBinder Native] Desired value already present, no action taken.");
-      return false;
+        // 3. Stale Entries Cleanup
+        // This removes old registry properties containing 'Discord.exe' that point to 
+        // non-existent previous version folders (e.g., app-1.0.9001), keeping the registry clean.
+        const cleanupCmd = `powershell -NoProfile -Command "$p = '${regPathEsc}'; if (Test-Path $p) { $props = Get-ItemProperty -Path $p; $props.PSObject.Properties | Where-Object { $_.Name -like '*Discord.exe*' -and $_.Name -ne '${nameEsc}' } | ForEach-Object { Remove-ItemProperty -Path $p -Name $_.Name -ErrorAction SilentlyContinue } }"`;
+        
+        await exec(cleanupCmd);
+        
+        return changed;
+    } catch (error) {
+        console.error("[GpuBinder Native] Registry operation failed:", error);
+        throw error;
     }
-  } catch (error) {
-    console.error("[GpuBinder Native] Error applying GPU preference:", error);
-    throw error;
-  }
 }

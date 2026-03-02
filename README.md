@@ -11,12 +11,11 @@
 
 **GPU Binder** is a Vencord plugin that forces Discord to use a specific GPU preference:
 
-- 🚀 High Performance
-- 🔋 Power Saving
-- ⚙️ System Default
+- 🚀 High Performance (Discrete GPU)
+- 🔋 Power Saving (Integrated GPU)
+- ⚙️ System Default (Let Windows decide)
 
-Windows sometimes resets GPU preferences after Discord updates.  
-This plugin ensures your selected mode stays applied automatically.
+Discord updates change the installation folder path (e.g., app-1.0.x), causing Windows to treat it as a new application and lose your previously assigned GPU preferences. This plugin automatically detects the new path and re-links your settings.
 
 > ⚠️ **Warning**
 >
@@ -61,7 +60,7 @@ git clone https://github.com/UnClide/vencord-gpubinder gpuBinder
 ### 4️⃣ Build Vencord
 
 ```bash
-cd ../../..
+cd ../..
 pnpm build
 ```
 
@@ -87,19 +86,18 @@ That’s it. Your preference will now persist even after updates.
 ## 🔧 How It Works
 
 The plugin:
-
-- Edits the registry key:
-
-```
-HKEY_CURRENT_USER\Software\Microsoft\DirectX\UserGpuPreferences
-```
-
-- Sets GPU preference for `Discord.exe`
-- Reapplies the value if Discord updates reset it
+- Detects the current `Discord.exe` path automatically on every startup.
+- Edits the registry key: `HKEY_CURRENT_USER\Software\Microsoft\DirectX\UserGpuPreferences`.
+- **Automatic Cleanup:** Scans for and removes stale registry entries from previous Discord versions (e.g., old `app-1.0.xxxx` folders) to keep your registry clean.
+- Re-applies your preferred setting if a Discord update changes the executable path.
 
 No background services.  
 No telemetry.  
 No scheduled tasks.
+
+## 🛠 Troubleshooting
+
+- **Settings not applying?** Make sure to **fully quit** Discord (from the system tray) and restart it. A simple `Ctrl + R` is not enough for native registry changes to take effect.
 
 ---
 

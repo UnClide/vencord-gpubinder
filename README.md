@@ -110,8 +110,16 @@ No scheduled tasks.
 
 ---
 
+## 🤝 Pairs Well With
+
+**[PowerSync](https://github.com/UnClide/vencord-powersync)** — another Vencord plugin by the same author that automatically switches Windows power plans when a game starts and restores them when it closes. Together, GPU Binder and PowerSync give you full hardware control directly from Discord with zero third-party software.
+
+---
+
 ## 🛡 License
 
 This project is licensed under the **MIT License**.
 
 See the [LICENSE](LICENSE) file for details.
+
+---

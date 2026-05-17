@@ -145,7 +145,11 @@ async function getRegistryPreference(discordPath: string): Promise<string> {
     const { stdout } = await runPowerShell(`
 param([string] $Path, [string] $Name)
 if (Test-Path $Path) {
-    Get-ItemPropertyValue -Path $Path -Name $Name -ErrorAction SilentlyContinue
+    try {
+        Get-ItemPropertyValue -Path $Path -Name $Name -ErrorAction Stop
+    } catch {
+        Write-Output ""
+    }
 }
 `, [REG_PATH, discordPath]);
 
